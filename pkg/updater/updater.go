@@ -57,7 +57,7 @@ func Update(path string) {
 
 			if maxVer != "v0.0.0" {
 				newLine := fmt.Sprintf("%s %s", pkg, maxVer)
-				fmt.Printf("%s, Latest Version: %s <- current version %s\n", pkg, maxVer, ver)
+				fmt.Printf("%s %s --> Latest Version: %s\n", pkg, ver, maxVer)
 				if _, err := writer.WriteString(newLine + "\n"); err != nil {
 					panic(err)
 				}
