@@ -11,28 +11,28 @@ import (
 
 func Update(path string) {
 	goModPath := path + "/go.mod"
-	newFilePath := path + "/verched_go.mod"
+	//newFilePath := path + "/verched_go.mod"
+	newFilePath := "verched_go.mod"
 	fmt.Printf("Processing file: %s\n", goModPath)
 
 	file, err := os.Open(goModPath)
 	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
-		return
+		panic(fmt.Sprintf("Error opening file: %v\n", err))
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			fmt.Printf("Error closing file: %v\n", err)
+			panic(fmt.Sprintf("Error closing file: %v\n", err))
 		}
 	}()
 
 	newFile, err := os.Create(newFilePath)
 	if err != nil {
-		fmt.Printf("Error creating new file: %v\n", err)
+		panic(fmt.Sprintf("Error creating new file: %v\n", err))
 		return
 	}
 	defer func() {
 		if err := newFile.Close(); err != nil {
-			fmt.Printf("Error closing new file: %v\n", err)
+			panic(fmt.Sprintf("Error closing new file: %v\n", err))
 		}
 	}()
 
@@ -44,9 +44,7 @@ func Update(path string) {
 		if pkg, ver, ok := liner.TakeALook(line); ok {
 			resp, err := handler.ParseResponse(handler.SendPackageRequest(pkg))
 			if err != nil {
-				fmt.Printf("Error fetching package info for %s: %v\n", pkg, err)
-				writer.WriteString(line + "\n") // Write original line in case of error
-				continue
+				panic(fmt.Sprintf("Error fetching package info for %s: %v\n", pkg, err))
 			}
 
 			maxVer := "v0.0.0"
@@ -59,12 +57,16 @@ func Update(path string) {
 			if maxVer != "v0.0.0" {
 				newLine := fmt.Sprintf("%s %s", pkg, maxVer)
 				fmt.Printf("%s, Latest Version: %s <- current version %s\n", pkg, maxVer, ver)
-				writer.WriteString(newLine + "\n")
+				if _, err := writer.WriteString(newLine + "\n"); err != nil {
+					panic(err)
+				}
 			} else {
-				writer.WriteString(line + "\n")
+				panic("PACKAGE IS NOT PERMITTED")
 			}
 		} else {
-			writer.WriteString(line + "\n")
+			if _, err := writer.WriteString(line + "\n"); err != nil {
+				panic(err)
+			}
 		}
 	}
 
@@ -75,4 +77,6 @@ func Update(path string) {
 	if err := scanner.Err(); err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
 	}
+
+	fmt.Printf("\nVerched! Take a look at %s", newFilePath)
 }
