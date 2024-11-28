@@ -9,9 +9,9 @@ import (
 	"github.com/s4bb4t/verche/pkg/liner"
 )
 
-// Update processes a go.mod file to find and update package versions.
 func Update(path string) {
 	goModPath := path + "/go.mod"
+	newFilePath := path + "/verched_go.mod"
 	fmt.Printf("Processing file: %s\n", goModPath)
 
 	file, err := os.Open(goModPath)
@@ -19,22 +19,33 @@ func Update(path string) {
 		fmt.Printf("Error opening file: %v\n", err)
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Error closing file: %v\n", err)
+		}
+	}()
 
-	newFile, err := os.Create("verched_go.mod")
+	newFile, err := os.Create(newFilePath)
 	if err != nil {
-		fmt.Printf("Error opening file: %v\n", err)
+		fmt.Printf("Error creating new file: %v\n", err)
 		return
 	}
-	defer newFile.Close()
+	defer func() {
+		if err := newFile.Close(); err != nil {
+			fmt.Printf("Error closing new file: %v\n", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
+	writer := bufio.NewWriter(newFile)
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		if pkg, ver, ok := liner.TakeALook(line); ok {
 			resp, err := handler.ParseResponse(handler.SendPackageRequest(pkg))
 			if err != nil {
 				fmt.Printf("Error fetching package info for %s: %v\n", pkg, err)
+				writer.WriteString(line + "\n") // Write original line in case of error
 				continue
 			}
 
@@ -45,13 +56,20 @@ func Update(path string) {
 				}
 			}
 
-			fmt.Printf("%s, Latest Version: %s <- current version %s\n", pkg, maxVer, ver)
-			_, err = newFile.WriteString(pkg + " " + maxVer + "\n")
-			if err != nil {
-				fmt.Printf("Error updating for %s: %v\n", pkg, err)
-				return
+			if maxVer != "v0.0.0" {
+				newLine := fmt.Sprintf("%s %s", pkg, maxVer)
+				fmt.Printf("%s, Latest Version: %s <- current version %s\n", pkg, maxVer, ver)
+				writer.WriteString(newLine + "\n")
+			} else {
+				writer.WriteString(line + "\n")
 			}
+		} else {
+			writer.WriteString(line + "\n")
 		}
+	}
+
+	if err := writer.Flush(); err != nil {
+		fmt.Printf("Error writing to file: %v\n", err)
 	}
 
 	if err := scanner.Err(); err != nil {
