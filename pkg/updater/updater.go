@@ -13,7 +13,8 @@ func Update(path string) {
 	goModPath := path + "/go.mod"
 	//newFilePath := path + "/verched_go.mod"
 	newFilePath := "verched_go.mod"
-	fmt.Printf("Processing file: %s\n", goModPath)
+
+	fmt.Printf("Processing file: %s\n\n", goModPath)
 
 	file, err := os.Open(goModPath)
 	if err != nil {

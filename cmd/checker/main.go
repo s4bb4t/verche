@@ -10,5 +10,6 @@ func main() {
 
 	_ = cfg
 
-	updater.Update("C:\\Users\\dmitriy.bratishkin\\GolandProjects\\rest_api")
+	updater.Update("C:\\Users\\dmitriy.bratishkin\\GolandProjects\\auth")
+
 }
