@@ -3,41 +3,47 @@ package updater
 import (
 	"bufio"
 	"fmt"
+	"github.com/s4bb4t/verche/pkg/config"
 	"golang.org/x/mod/semver"
 	"io"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/s4bb4t/verche/pkg/handler"
 	"github.com/s4bb4t/verche/pkg/liner"
 )
 
-func Update(path string, goVersion string) {
-	goModPath := path + "/go.mod"
-	newFilePath := path + "/verched_go.mod"
+func Update(cfg *config.Config) (err error) {
+	for i := 0; i < 2; i++ {
+		if err := update(cfg); err != nil {
+			return err
+		}
+	}
 
-	fmt.Printf("Processing file: %s\n\n", goModPath)
-
-	// Открываем исходный файл
-	file, err := os.Open(goModPath)
+	err = os.Remove(cfg.FileSystem.PathToVerchedFile)
 	if err != nil {
-		panic(fmt.Sprintf("Error opening file: %v\n", err))
+		panic(err)
+	}
+
+	return nil
+}
+
+func update(cfg *config.Config) error {
+	file, err := os.Open(cfg.FileSystem.PathToFile)
+	if err != nil {
+		return fmt.Errorf("Error opening file: %w\n", err)
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
-			panic(fmt.Sprintf("Error closing file: %v\n", err))
-		}
+		_ = file.Close()
 	}()
 
-	// Создаем новый файл для записи
-	newFile, err := os.Create(newFilePath)
+	newFile, err := os.Create(cfg.FileSystem.PathToVerchedFile)
 	if err != nil {
-		panic(fmt.Sprintf("Error creating new file: %v\n", err))
+		return fmt.Errorf("Error creating new file: %v\n", err)
 	}
 	defer func() {
-		if err := newFile.Close(); err != nil {
-			panic(fmt.Sprintf("Error closing new file: %v\n", err))
-		}
+		_ = file.Close()
 	}()
 
 	scanner := bufio.NewScanner(file)
@@ -48,7 +54,7 @@ func Update(path string, goVersion string) {
 		if pkg, ver, ok := liner.TakeALook(line); ok {
 			resp, err := handler.ParseResponse(handler.SendPackageRequest(pkg))
 			if err != nil {
-				panic(fmt.Sprintf("Error fetching package info for %s: %v\n", pkg, err))
+				return fmt.Errorf("Error fetching package info for %s: %v\n", pkg, err)
 			}
 
 			maxVer := ver
@@ -63,35 +69,35 @@ func Update(path string, goVersion string) {
 				newLine := fmt.Sprintf("%s %s", pkg, maxVer)
 				fmt.Printf("%s %s --> Latest Version: %s\n", pkg, ver, maxVer)
 				if _, err := writer.WriteString("\t" + newLine + "\n"); err != nil {
-					panic(err)
+					return fmt.Errorf("Error writing to buffer: %w\n", err)
 				}
 			} else {
-				panic("PACKAGE IS NOT PERMITTED")
+				return fmt.Errorf("PACKAGE IS NOT PERMITTED: %s", pkg)
 			}
 		} else {
 			if strings.Contains(line, "toolchain") {
 				line = "toolchain go1.22.0"
 			} else if strings.Contains(line, "go 1.") {
-				line = "go " + goVersion
+				line = "go " + cfg.GoVersion
 			}
 			if _, err := writer.WriteString(line + "\n"); err != nil {
-				panic(err)
+				return fmt.Errorf("Error writing to buffer: %w\n", err)
 			}
 		}
-	}
-
-	if err := writer.Flush(); err != nil {
-		fmt.Printf("Error writing to file: %v\n", err)
 	}
 
 	if err := scanner.Err(); err != nil {
 		fmt.Printf("Error reading file: %v\n", err)
 	}
+	if err := writer.Flush(); err != nil {
+		fmt.Printf("Error writing to file: %v\n", err)
+	}
 
-	fmt.Println("\nOverwriting the original go.mod with the updated content.")
-	overwriteFile(newFilePath, goModPath)
+	fmt.Println("Overwriting the original go.mod with the updated content")
+	overwriteFile(cfg.FileSystem.PathToVerchedFile, cfg.FileSystem.PathToFile)
 
-	fmt.Printf("\nVerched! Updated file: %s", goModPath)
+	fmt.Printf("Verched! Updated file: %s\n", cfg.FileSystem.PathToFile)
+	return runGoModTidy(cfg.FileSystem.BasePath)
 }
 
 func overwriteFile(sourceFile, destFile string) {
@@ -113,7 +119,7 @@ func overwriteFile(sourceFile, destFile string) {
 	}
 }
 
-func CopyFile(source, destination string) error {
+func copyFile(source, destination string) error {
 	src, err := os.Open(source)
 	if err != nil {
 		return err
@@ -128,4 +134,14 @@ func CopyFile(source, destination string) error {
 
 	_, err = io.Copy(dst, src)
 	return err
+}
+
+func runGoModTidy(path string) error {
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = path
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("Running 'go mod tidy' in directory: %s\n", path)
+	return cmd.Run()
 }
