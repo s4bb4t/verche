@@ -13,8 +13,8 @@ import (
 
 func Update(path string, goVersion string) {
 	goModPath := path + "/go.mod"
-	//newFilePath := path + "/verched_go.mod"
-	newFilePath := "verched_go.mod"
+	newFilePath := path + "/verched_go.mod"
+	//newFilePath := "verched_go.mod"
 
 	fmt.Printf("Processing file: %s\n\n", goModPath)
 
