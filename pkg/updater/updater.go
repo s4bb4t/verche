@@ -16,11 +16,6 @@ func Update(path string, goVersion string) {
 	goModPath := path + "/go.mod"
 	newFilePath := path + "/verched_go.mod"
 
-	err := copyFile(goModPath, path+"/go.mod-old")
-	if err != nil {
-		panic(fmt.Sprintf("Error copying file: %v\n", err))
-	}
-
 	fmt.Printf("Processing file: %s\n\n", goModPath)
 
 	// Открываем исходный файл
@@ -118,7 +113,7 @@ func overwriteFile(sourceFile, destFile string) {
 	}
 }
 
-func copyFile(source, destination string) error {
+func CopyFile(source, destination string) error {
 	src, err := os.Open(source)
 	if err != nil {
 		return err

@@ -21,6 +21,11 @@ func main() {
 
 	cfg := config.MustLoad()
 
+	err := updater.CopyFile(*inputPath, *inputPath+"go.mod-old")
+	if err != nil {
+		panic(fmt.Sprintf("Error copying file: %v\n", err))
+	}
+
 	for i := 0; i < 2; i++ {
 		fmt.Printf("Update and tidy iteration %d\n", i+1)
 
@@ -31,6 +36,10 @@ func main() {
 			fmt.Printf("Error running 'go mod tidy': %v\n", err)
 			os.Exit(1)
 		}
+	}
+
+	if err := os.Remove(*inputPath + "/verched_go.mod"); err != nil {
+		panic(fmt.Sprintf("Error removing file: %v\n", err))
 	}
 
 	fmt.Println("Update and tidy process completed successfully.")
