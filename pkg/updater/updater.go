@@ -53,8 +53,6 @@ func Update(path string, goVersion string) {
 			maxVer := ver
 			for _, art := range resp.Artifacts {
 				version := art.Go.Version
-				if strings.Contains(pkg, "google.golang.org/grpc") {
-				}
 				if semver.IsValid(version) && semver.Compare(version, maxVer) > 0 && art.State.Status == "PERMITTED" {
 					maxVer = version
 				}
