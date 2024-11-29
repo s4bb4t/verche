@@ -8,8 +8,5 @@ import (
 func main() {
 	cfg := config.MustLoad()
 
-	_ = cfg
-
-	updater.Update("C:\\Users\\dmitriy.bratishkin\\GolandProjects\\auth")
-
+	updater.Update("C:\\Users\\dmitriy.bratishkin\\GolandProjects\\auth", cfg.GoVersion)
 }

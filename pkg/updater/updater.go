@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/s4bb4t/verche/pkg/handler"
 	"github.com/s4bb4t/verche/pkg/liner"
 )
 
-func Update(path string) {
+func Update(path string, goVersion string) {
 	goModPath := path + "/go.mod"
 	//newFilePath := path + "/verched_go.mod"
 	newFilePath := "verched_go.mod"
@@ -58,13 +59,18 @@ func Update(path string) {
 			if maxVer != "v0.0.0" {
 				newLine := fmt.Sprintf("%s %s", pkg, maxVer)
 				fmt.Printf("%s %s --> Latest Version: %s\n", pkg, ver, maxVer)
-				if _, err := writer.WriteString(newLine + "\n"); err != nil {
+				if _, err := writer.WriteString("\t" + newLine + "\n"); err != nil {
 					panic(err)
 				}
 			} else {
 				panic("PACKAGE IS NOT PERMITTED")
 			}
 		} else {
+			if strings.Contains(line, "go 1.") {
+				line = "go " + goVersion
+			} else if strings.Contains(line, "toolchain") {
+				line = "toolchain go1.22.0"
+			}
 			if _, err := writer.WriteString(line + "\n"); err != nil {
 				panic(err)
 			}
