@@ -3,6 +3,7 @@ package updater
 import (
 	"bufio"
 	"fmt"
+	"golang.org/x/mod/semver"
 	"os"
 	"strings"
 
@@ -49,14 +50,17 @@ func Update(path string, goVersion string) {
 				panic(fmt.Sprintf("Error fetching package info for %s: %v\n", pkg, err))
 			}
 
-			maxVer := "v0.0.0"
+			maxVer := ver
 			for _, art := range resp.Artifacts {
-				if art.Go.Version > maxVer && art.State.Status == "PERMITTED" {
-					maxVer = art.Go.Version
+				version := art.Go.Version
+				if strings.Contains(pkg, "google.golang.org/grpc") {
+				}
+				if semver.IsValid(version) && semver.Compare(version, maxVer) > 0 && art.State.Status == "PERMITTED" {
+					maxVer = version
 				}
 			}
 
-			if maxVer != "v0.0.0" {
+			if maxVer != "" {
 				newLine := fmt.Sprintf("%s %s", pkg, maxVer)
 				fmt.Printf("%s %s --> Latest Version: %s\n", pkg, ver, maxVer)
 				if _, err := writer.WriteString("\t" + newLine + "\n"); err != nil {
@@ -66,10 +70,14 @@ func Update(path string, goVersion string) {
 				panic("PACKAGE IS NOT PERMITTED")
 			}
 		} else {
-			if strings.Contains(line, "go 1.") {
-				line = "go " + goVersion
-			} else if strings.Contains(line, "toolchain") {
+			if strings.Contains(line, "toolchain") {
+				fmt.Println(line)
 				line = "toolchain go1.22.0"
+				fmt.Println(line)
+			} else if strings.Contains(line, "go 1.") {
+				fmt.Println(line)
+				line = "go " + goVersion
+				fmt.Println(line)
 			}
 			if _, err := writer.WriteString(line + "\n"); err != nil {
 				panic(err)
