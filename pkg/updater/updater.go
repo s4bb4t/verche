@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"golang.org/x/mod/semver"
+	"io"
 	"os"
 	"strings"
 
@@ -14,10 +15,15 @@ import (
 func Update(path string, goVersion string) {
 	goModPath := path + "/go.mod"
 	newFilePath := path + "/verched_go.mod"
-	//newFilePath := "verched_go.mod"
+
+	err := copyFile(goModPath, path+"/go.mod-old")
+	if err != nil {
+		panic(fmt.Sprintf("Error copying file: %v\n", err))
+	}
 
 	fmt.Printf("Processing file: %s\n\n", goModPath)
 
+	// Открываем исходный файл
 	file, err := os.Open(goModPath)
 	if err != nil {
 		panic(fmt.Sprintf("Error opening file: %v\n", err))
@@ -28,10 +34,10 @@ func Update(path string, goVersion string) {
 		}
 	}()
 
+	// Создаем новый файл для записи
 	newFile, err := os.Create(newFilePath)
 	if err != nil {
 		panic(fmt.Sprintf("Error creating new file: %v\n", err))
-		return
 	}
 	defer func() {
 		if err := newFile.Close(); err != nil {
@@ -69,13 +75,9 @@ func Update(path string, goVersion string) {
 			}
 		} else {
 			if strings.Contains(line, "toolchain") {
-				fmt.Println(line)
 				line = "toolchain go1.22.0"
-				fmt.Println(line)
 			} else if strings.Contains(line, "go 1.") {
-				fmt.Println(line)
 				line = "go " + goVersion
-				fmt.Println(line)
 			}
 			if _, err := writer.WriteString(line + "\n"); err != nil {
 				panic(err)
@@ -91,5 +93,44 @@ func Update(path string, goVersion string) {
 		fmt.Printf("Error reading file: %v\n", err)
 	}
 
-	fmt.Printf("\nVerched! Take a look at %s", newFilePath)
+	fmt.Println("\nOverwriting the original go.mod with the updated content.")
+	overwriteFile(newFilePath, goModPath)
+
+	fmt.Printf("\nVerched! Updated file: %s", goModPath)
+}
+
+func overwriteFile(sourceFile, destFile string) {
+	src, err := os.Open(sourceFile)
+	if err != nil {
+		panic(fmt.Sprintf("Error opening source file: %v\n", err))
+	}
+	defer src.Close()
+
+	dst, err := os.Create(destFile)
+	if err != nil {
+		panic(fmt.Sprintf("Error creating destination file: %v\n", err))
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	if err != nil {
+		panic(fmt.Sprintf("Error copying content: %v\n", err))
+	}
+}
+
+func copyFile(source, destination string) error {
+	src, err := os.Open(source)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.Create(destination)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	return err
 }

@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-
 	"github.com/s4bb4t/verche/pkg/config"
 	"github.com/s4bb4t/verche/pkg/updater"
+	"os"
+	"os/exec"
 )
 
 func main() {
@@ -21,5 +21,27 @@ func main() {
 
 	cfg := config.MustLoad()
 
-	updater.Update(*inputPath, cfg.GoVersion)
+	for i := 0; i < 2; i++ {
+		fmt.Printf("Update and tidy iteration %d\n", i+1)
+
+		updater.Update(*inputPath, cfg.GoVersion)
+
+		err := runGoModTidy(*inputPath)
+		if err != nil {
+			fmt.Printf("Error running 'go mod tidy': %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	fmt.Println("Update and tidy process completed successfully.")
+}
+
+func runGoModTidy(path string) error {
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = path
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	fmt.Printf("Running 'go mod tidy' in directory: %s\n", path)
+	return cmd.Run()
 }

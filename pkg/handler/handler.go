@@ -53,7 +53,7 @@ func SendPackageRequest(packageName string) *http.Response {
 			}{Zones: []string{}},
 		},
 		Offset: 0,
-		Limit:  50,
+		Limit:  1000,
 		Strict: false,
 	}
 
