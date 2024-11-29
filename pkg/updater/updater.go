@@ -18,9 +18,6 @@ func Update(cfg *config.Config) error {
 	if err := update(cfg); err != nil {
 		return err
 	}
-	if err := update(cfg); err != nil {
-		return err
-	}
 	if err := os.Remove(cfg.FileSystem.PathToVerchedFile); err != nil {
 		return err
 	}
