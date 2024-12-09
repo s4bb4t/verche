@@ -9,22 +9,114 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/s4bb4t/verche/pkg/handler"
 	"github.com/s4bb4t/verche/pkg/liner"
 )
 
+const (
+	manual byte = iota
+	auto
+)
+
 func Update(cfg *config.Config) error {
-	if err := update(cfg); err != nil {
-		return err
-	}
-	if err := os.Remove(cfg.FileSystem.PathToVerchedFile); err != nil {
-		return err
+	if cfg.Method == manual {
+		if err := updateManual(cfg); err != nil {
+			return err
+		}
+	} else if cfg.Method == auto {
+		if err := updateAuto(cfg); err != nil {
+			return err
+		}
+		if err := os.Remove(cfg.FileSystem.PathToVerchedFile); err != nil {
+			return err
+		}
 	}
 	return nil
 }
+func updateAuto(cfg *config.Config) error {
+	file, err := os.Open(cfg.FileSystem.PathToFile)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-func update(cfg *config.Config) error {
+	newFile, err := os.Create(cfg.FileSystem.PathToVerchedFile)
+	if err != nil {
+		return err
+	}
+	defer newFile.Close()
+
+	scanner := bufio.NewScanner(file)
+	writer := bufio.NewWriter(newFile)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if pkg, _, ok := liner.TakeALook(line); ok {
+			resp, err := handler.ParseResponse(handler.SendPackageRequest(pkg))
+			if err != nil {
+				return fmt.Errorf("error fetching package info for %s: %v", pkg, err)
+			}
+
+			var lastDate time.Time
+			var lastRequestedArtifact handler.Artifact
+			currentVer := "v0.0.0"
+
+			for _, art := range resp.Artifacts {
+				// skip for rejected other packages that contain current package's name
+				if art.State.Status != "PERMITTED" || art.Go.Name != pkg {
+					continue
+				}
+
+				version := art.Go.Version
+				if semver.IsValid(version) && semver.Compare(version, currentVer) > 0 {
+					currentVer = version
+					continue
+				}
+
+				date, err := time.Parse("02-01-2006 15:04:05.000 MST", art.State.RequestTime)
+				if err != nil {
+					return fmt.Errorf("error in request time: %w", err)
+				}
+				if date.After(lastDate) {
+					lastDate = date
+					lastRequestedArtifact = art
+				}
+			}
+			if currentVer == "v0.0.0" {
+				if lastRequestedArtifact.Go.Version == "" {
+					return fmt.Errorf("\n\npackage not found\n\n")
+				}
+				currentVer = lastRequestedArtifact.Go.Version
+			}
+
+			newLine := fmt.Sprintf("%s %s", pkg, currentVer)
+			if _, err := writer.WriteString("\t" + newLine + "\n"); err != nil {
+				return err
+			}
+		} else {
+			if strings.Contains(line, "go 1.") {
+				line = "go " + cfg.GoVersion
+			}
+			if _, err := writer.WriteString(line + "\n"); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+
+	overwriteFile(cfg.FileSystem.PathToVerchedFile, cfg.FileSystem.PathToFile)
+	return runGoModTidy(cfg.FileSystem.BasePath)
+}
+
+func updateManual(cfg *config.Config) error {
 	file, err := os.Open(cfg.FileSystem.PathToFile)
 	if err != nil {
 		return err
@@ -45,33 +137,44 @@ func update(cfg *config.Config) error {
 		if pkg, ver, ok := liner.TakeALook(line); ok {
 			resp, err := handler.ParseResponse(handler.SendPackageRequest(pkg))
 			if err != nil {
-				return fmt.Errorf("Error fetching package info for %s: %v", pkg, err)
+				return fmt.Errorf("error fetching package info for %s: %v", pkg, err)
 			}
 
-			maxVer := ver
+			var lastDate time.Time
+			var lastRequestedArtifact handler.Artifact
+			currentVer := "v0.0.0"
+
 			for _, art := range resp.Artifacts {
-				version := art.Go.Version
-				if semver.IsValid(version) && semver.Compare(version, maxVer) > 0 && art.State.Status == "PERMITTED" {
-					maxVer = version
+				// skip for rejected other packages that contain current package's name
+				if art.State.Status != "PERMITTED" || art.Go.Name != pkg {
+					continue
 				}
+
+				version := art.Go.Version
+				if semver.IsValid(version) && semver.Compare(version, currentVer) > 0 {
+					currentVer = version
+					continue
+				}
+
+				date, err := time.Parse("02-01-2006 15:04:05.000 MST", art.State.RequestTime)
+				if err != nil {
+					return fmt.Errorf("error in request time: %w", err)
+				}
+				if date.After(lastDate) {
+					lastDate = date
+					lastRequestedArtifact = art
+				}
+			}
+			if currentVer == "v0.0.0" {
+				if lastRequestedArtifact.Go.Version == "" {
+					return fmt.Errorf("\n\npackage not found\n\n")
+				}
+				currentVer = lastRequestedArtifact.Go.Version
 			}
 
-			if maxVer != "" {
-				newLine := fmt.Sprintf("%s %s", pkg, maxVer)
-				fmt.Printf("%s %s --> Latest Version: %s\n", pkg, ver, maxVer)
-				if _, err := writer.WriteString("\t" + newLine + "\n"); err != nil {
-					return err
-				}
-			} else {
-				return fmt.Errorf("PACKAGE IS NOT PERMITTED: %s", pkg)
-			}
-		} else {
-			if strings.Contains(line, "toolchain") {
-				line = "toolchain go1.22.0"
-			} else if strings.Contains(line, "go 1.") {
-				line = "go " + cfg.GoVersion
-			}
-			if _, err := writer.WriteString(line + "\n"); err != nil {
+			newLine := fmt.Sprintf("%s %s", pkg, currentVer)
+			fmt.Printf("%s %s --> Latest Version: %s\n", pkg, ver, currentVer)
+			if _, err := writer.WriteString("\t" + newLine + "\n"); err != nil {
 				return err
 			}
 		}
@@ -84,8 +187,7 @@ func update(cfg *config.Config) error {
 		return err
 	}
 
-	overwriteFile(cfg.FileSystem.PathToVerchedFile, cfg.FileSystem.PathToFile)
-	return runGoModTidy(cfg.FileSystem.BasePath)
+	return nil
 }
 
 func overwriteFile(sourceFile, destFile string) {

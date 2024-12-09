@@ -11,6 +11,10 @@ func TakeALook(line string) (string, string, bool) {
 	if strings.HasPrefix(line, "go 1.") {
 		return "", "", false
 	}
+
+	if strings.Contains(line, "//") {
+		return "", "", false
+	}
 	line = strings.Split(line, "//")[0]
 	line = strings.TrimSpace(line)
 

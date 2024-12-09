@@ -15,6 +15,7 @@ type fileSystem struct {
 type Config struct {
 	GoVersion  string
 	FileSystem fileSystem
+	Method     byte
 }
 
 func newFS(path string) fileSystem {
@@ -28,9 +29,14 @@ func newFS(path string) fileSystem {
 	}
 }
 
+const (
+	manualUsage = "manual"
+)
+
 func MustLoad() *Config {
 	inputPath := flag.String("in", "", "Path to the project directory containing go.mod (required)")
 	goVersion := flag.String("v", "1.23.0", "Version of Golang")
+	method := flag.String("m", manualUsage, "Method of usage")
 
 	flag.Parse()
 
@@ -46,8 +52,15 @@ func MustLoad() *Config {
 		os.Exit(1)
 	}
 
-	return &Config{
-		GoVersion:  *goVersion,
-		FileSystem: newFS(*inputPath),
+	var cfg Config
+	cfg.GoVersion = *goVersion
+	cfg.FileSystem = newFS(*inputPath)
+
+	if *method == manualUsage {
+		cfg.Method = 0
+	} else {
+		cfg.Method = 1
 	}
+
+	return &cfg
 }

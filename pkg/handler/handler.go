@@ -31,7 +31,8 @@ type ArtifactGo struct {
 }
 
 type ArtifactState struct {
-	Status string `json:"status"`
+	Status      string `json:"status"`
+	RequestTime string `json:"requestTime"`
 }
 
 type Artifact struct {
