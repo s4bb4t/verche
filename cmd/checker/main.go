@@ -14,5 +14,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Update and tidy process completed successfully.")
+	fmt.Println("Update completed successfully!")
 }

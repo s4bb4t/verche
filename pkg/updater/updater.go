@@ -29,12 +29,16 @@ func Update(cfg *config.Config) error {
 		if err := updateAuto(cfg); err != nil {
 			return err
 		}
+		if err := updateAuto(cfg); err != nil {
+			return err
+		}
 		if err := os.Remove(cfg.FileSystem.PathToVerchedFile); err != nil {
 			return err
 		}
 	}
 	return nil
 }
+
 func updateAuto(cfg *config.Config) error {
 	file, err := os.Open(cfg.FileSystem.PathToFile)
 	if err != nil {
@@ -53,7 +57,7 @@ func updateAuto(cfg *config.Config) error {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if pkg, _, ok := liner.TakeALook(line); ok {
+		if pkg, ver, ok := liner.TakeALook(line); ok {
 			resp, err := handler.ParseResponse(handler.SendPackageRequest(pkg))
 			if err != nil {
 				return fmt.Errorf("error fetching package info for %s: %v", pkg, err)
@@ -70,6 +74,7 @@ func updateAuto(cfg *config.Config) error {
 				}
 
 				version := art.Go.Version
+
 				if semver.IsValid(version) && semver.Compare(version, currentVer) > 0 {
 					currentVer = version
 					continue
@@ -91,6 +96,9 @@ func updateAuto(cfg *config.Config) error {
 				currentVer = lastRequestedArtifact.Go.Version
 			}
 
+			if ver != currentVer {
+				fmt.Println("changed", pkg, ver, currentVer)
+			}
 			newLine := fmt.Sprintf("%s %s", pkg, currentVer)
 			if _, err := writer.WriteString("\t" + newLine + "\n"); err != nil {
 				return err
@@ -134,7 +142,7 @@ func updateManual(cfg *config.Config) error {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if pkg, ver, ok := liner.TakeALook(line); ok {
+		if pkg, ver, ok := liner.TakeALook(line); ok && !strings.Contains(line, "// indirect") {
 			resp, err := handler.ParseResponse(handler.SendPackageRequest(pkg))
 			if err != nil {
 				return fmt.Errorf("error fetching package info for %s: %v", pkg, err)
@@ -214,6 +222,6 @@ func runGoModTidy(path string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	fmt.Printf("Running 'go mod tidy' in directory: %s\n", path)
+	fmt.Println("go mod tidy")
 	return cmd.Run()
 }

@@ -12,9 +12,6 @@ func TakeALook(line string) (string, string, bool) {
 		return "", "", false
 	}
 
-	if strings.Contains(line, "//") {
-		return "", "", false
-	}
 	line = strings.Split(line, "//")[0]
 	line = strings.TrimSpace(line)
 
